@@ -6,7 +6,7 @@ services:
     environment:
       - POSTGRES_PASSWORD=postgres
   app:
-    image: tolgee/tolgee
+    image: tolgee/tolgee-opensource
     ports:
       - ${exposePort}:8080
     env_file:

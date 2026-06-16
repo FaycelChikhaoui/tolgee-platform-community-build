@@ -4,9 +4,14 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Get current branch name
-const branchName = execSync('git rev-parse --abbrev-ref HEAD')
-  .toString()
-  .trim();
+let branchName = 'docker-build';
+try {
+  branchName = execSync('git rev-parse --abbrev-ref HEAD')
+    .toString()
+    .trim();
+} catch (e) {
+  console.warn('Could not read git branch, defaulting to docker-build');
+}
 
 // Create JSON content
 const content = {

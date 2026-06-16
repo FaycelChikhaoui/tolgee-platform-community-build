@@ -1,0 +1,42 @@
+# Stage 1: Build the app using a container with Java and Node.js
+FROM eclipse-temurin:21-jdk AS builder
+
+# Install Node.js (required for compiling the frontend)
+RUN apt-get update && apt-get install -y curl && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs
+
+WORKDIR /app
+
+# Copy the source code (the 'ee' folder is excluded because you deleted it)
+COPY . .
+
+# Run the Gradle build and prepare the files for Docker
+RUN ./gradlew dockerPrepare --no-daemon
+
+
+# Stage 2: Create the final lightweight application image
+FROM postgres:13.23-alpine3.22
+
+# Install JRE and dependencies required by Tolgee
+RUN apk --no-cache upgrade && apk --no-cache add openjdk21-jre libxml2
+
+EXPOSE 8080
+
+VOLUME /data
+
+ENV HEALTHCHECK_PORT=8080 \
+    spring_profiles_active=docker
+
+# Copy the compiled artifacts from the builder stage
+COPY --from=builder /app/build/docker/BOOT-INF/lib /app/lib
+COPY --from=builder /app/build/docker/META-INF /app/META-INF
+COPY --from=builder /app/build/docker/BOOT-INF/classes /app
+COPY --chmod=755 docker/app/cmd.sh /app
+
+# Download OpenTelemetry Agent for observability
+ARG OTEL_AGENT_VERSION=2.26.1
+
+RUN wget -O /app/opentelemetry-javaagent.jar "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar"   
+
+ENTRYPOINT ["/app/cmd.sh"]   
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=20 CMD wget --spider -q "http://127.0.0.1:$HEALTHCHECK_PORT/actuator/health" || exit 1ealth" || exit 1
